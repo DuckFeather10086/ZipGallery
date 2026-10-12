@@ -1,0 +1,8 @@
+7-Zip 26.04, unmodified official universal macOS binary (arm64/x86_64).
+Copyright (C) 1999-2026 Igor Pavlov. https://www.7-zip.org/
+Binary: https://github.com/ip7z/7zip/releases/download/26.04/7z2604-mac.tar.xz
+SHA256: bee04358cbcbc7106273cee0e8d72916db2696c48067a3538c34d8cd6fd16578
+Corresponding source is included as 7z2604-src.tar.xz.
+Source: https://github.com/ip7z/7zip/releases/download/26.04/7z2604-src.tar.xz
+SHA256: 9691944c0fe0d01bb49373a704fb983fd33bc98b1738695179dfbf99ac1734f6
+License: see License.txt and the bundled source. ZipGallery executes this independent, replaceable program without modifying it.

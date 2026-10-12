@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>ZipGallery</title>
+  <rect x="64" y="64" width="896" height="896" rx="196" fill="#29363f"/>
+  <rect x="222" y="228" width="580" height="568" rx="64" fill="#f1eee6"/>
+  <path d="M286 228h452a64 64 0 0 1 64 64v44H222v-44a64 64 0 0 1 64-64" fill="#d9d4c8"/>
+  <path d="M338 230v348" stroke="#29363f" stroke-width="20"/>
+  <path d="M311 254h25m4 32h25m-54 32h25m4 32h25m-54 32h25m4 32h25m-54 32h25m4 32h25m-54 32h25" stroke="#29363f" stroke-width="20"/>
+  <rect x="300" y="548" width="76" height="110" rx="26" fill="#bd7947"/>
+  <rect x="323" y="574" width="30" height="46" rx="12" fill="#f1eee6"/>
+  <rect x="426" y="402" width="306" height="278" rx="28" fill="#a9c3ce"/>
+  <circle cx="651" cy="466" r="28" fill="#f1eee6"/>
+  <path d="m426 622 87-112 85 96 46-55 88 104v-3a28 28 0 0 1-28 28H454a28 28 0 0 1-28-28Z" fill="#557782"/>
+</svg>

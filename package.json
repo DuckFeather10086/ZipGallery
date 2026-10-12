@@ -1,0 +1,29 @@
+{
+  "name": "zipgallery",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "go run github.com/egoist/mygo/cmd/mygo dev",
+    "generate": "go run github.com/egoist/mygo/cmd/mygo generate",
+    "build": "bun run icons && go run github.com/egoist/mygo/cmd/mygo build",
+    "dev:web": "vite",
+    "build:web": "tsc --noEmit && vite build",
+    "icons": "bun scripts/icons.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "3.14.15",
+    "mygo-runtime": "0.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "mygo-cli": "0.4.5",
+    "prettier": "3.9.10",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  },
+  "license": "MIT"
+}
