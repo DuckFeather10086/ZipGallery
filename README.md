@@ -1,101 +1,122 @@
+<p align="center"><img src="resources/icon.svg" width="112" alt="ZipGallery 图标"></p>
+
 # ZipGallery
 
-[MIT License](LICENSE) · macOS Apple Silicon
+**直接看 ZIP / CBZ 里的图片，也能处理日常压缩与解压。**
 
-[下载发行版](https://github.com/DuckFeather10086/ZipGallery/releases)
+ZipGallery 是一款 macOS 压缩包工具：浏览图集时无需先解压整个包；处理普通文件时，可以查看文件列表、创建压缩包或解压。应用已内置 7zz，不需要另外安装 7-Zip。
 
-macOS 上的 ZIP / CBZ 图片浏览器，使用 MyGo + Go + React / TypeScript。直接浏览包内目录与真实缩略图，按需读取单张图片，不完整解压压缩包。
+[下载最新版](https://github.com/DuckFeather10086/ZipGallery/releases/latest) · [使用方法](#快速上手) · [开发文档](docs/DEVELOPMENT.md) · [MIT License](LICENSE)
 
-## 启动
+## 界面预览
 
-已构建的 Apple Silicon 应用：`build/darwin-arm64/ZipGallery.app`。双击即可打开，或：
+**图片网格**：浏览包内图片，保留目录结构，也可切换到全部图片。
+
+![ZipGallery 图片网格与最近文件](docs/screenshots/gallery.jpg)
+
+**大图阅读**：滚轮或方向键连续翻页，支持适应窗口、实际大小和缩放。
+
+![ZipGallery 大图阅读模式](docs/screenshots/viewer.jpg)
+
+**文件列表**：查看文件名、大小和加密状态，按名称筛选，再按需解压。
+
+![ZipGallery 压缩包文件列表](docs/screenshots/files.jpg)
+
+截图来自实际运行的应用，展示的是项目生成的合成样本。界面支持简体中文和 English，可在左下角切换。
+
+## 能做什么
+
+- **包内看图**：预览未加密 ZIP / CBZ 中的 JPEG、PNG、WebP，支持自然排序、缩略图、目录导航和大图阅读。
+- **连贯翻页**：滚轮和按住方向键都能连续翻页；放大后滚轮用于滚动图片。
+- **记住阅读位置**：保存最近 20 个压缩包与阅读进度；本次使用期间可在已打开的包之间后退、前进。
+- **普通压缩与解压**：创建 ZIP、7z、tar.gz；查看和解压 7zz 支持的格式，包括 RAR。RAR 仅支持读取和解压，不能创建。
+- **密码与任务状态**：ZIP / 7z 创建时可设置密码，解压支持输入密码，任务显示进度并可取消。输出使用新名称，拒绝覆盖已有内容。
+- **已挂载 SMB**：使用 macOS 已连接的共享目录打开压缩包，也可向共享保存压缩或解压结果。
+- **文件名编码修复**：为旧编码 ZIP / CBZ 预览并另存 UTF-8 副本，保留原包。
+- **系统集成**：应用与压缩包文件图标，支持拖入文件及 Finder 的“打开方式”。
+
+## 下载与安装
+
+当前提供 **macOS Apple Silicon（arm64，M 系列芯片）** 安装包。已在 macOS 27.0.1 上验证；暂未提供 Intel Mac、Windows 或 Linux 版本，也未完成旧版 macOS 兼容性验证。
+
+1. 打开 [Releases 下载页](https://github.com/DuckFeather10086/ZipGallery/releases/latest)。
+2. 在 **Assets** 中下载 `ZipGallery-版本号-macos-arm64.dmg`。不要把 GitHub 自动生成的 `Source code` 当成安装包。
+3. 打开 DMG，把 `ZipGallery.app` 拖到“应用程序”，再从“应用程序”启动。
+4. 也可以下载 `ZipGallery-版本号-macos-arm64.app.zip`，解压后将应用移到“应用程序”。两种安装方式任选其一。
+
+**首次启动提示**：当前发行版使用 ad-hoc 签名，尚未进行 Apple Developer ID 签名或公证。如果 macOS 提示无法验证开发者，请先确认文件来自本仓库的 Release；信任此来源后，可按 [Apple 的官方说明](https://support.apple.com/zh-cn/102445)，在尝试启动后进入“系统设置 → 隐私与安全性”，为此应用选择“仍要打开”。
+
+Release 中的 `SHA256SUMS` 可用于核对下载文件。普通使用无需安装 Go、Bun 或额外的压缩内核。
+
+### 设为默认打开程序
+
+在 Finder 中选中一个压缩包，按 `⌘I` 打开“显示简介”，在“打开方式”选择 ZipGallery，再点“全部更改”。对需要的文件格式分别设置一次。
+
+应用声明了 ZIP、CBZ、7z、RAR、tar、gz、bz2、xz、tgz 的打开关联。安装应用不会自动替所有用户修改默认打开方式。
+
+## 快速上手
+
+### 看图集 / 漫画
+
+1. 点击“打开压缩包…”或按 `⌘O`，选择 ZIP / CBZ；也可以把文件拖进窗口。
+2. 点击文件夹进入目录，或选择“全部图片”跨目录浏览。
+3. 点击缩略图进入大图。适应窗口模式下，滚轮或方向键都可以翻页。
+4. 按 `Esc` 返回网格。下次从“最近文件”打开这个包，再点击“继续阅读”即可回到保存的位置。
+
+没有可预览图片的 ZIP，以及 7z、RAR 等其他格式，会进入文件列表。加密压缩包目前使用文件列表和解压流程，不提供加密图片的包内预览。
+
+### 解压 / 新建压缩包
+
+**解压**：打开压缩包 → 点击“解压” → 如有需要填写密码 → 点击“开始” → 选择一个新的输出文件夹名称。任务运行时可查看进度或取消。
+
+**压缩**：点击“新建压缩包” → 选择同一目录下的多个文件，或一个文件夹 → 选择 ZIP / 7z / tar.gz → 按需设置密码 → 点击“开始”并选择新的输出文件名。tar.gz 不提供密码选项。
+
+密码不会写入历史记录。解压拒绝不安全路径和链接；若目标名称已存在，请换一个新名称。
+
+### 使用 SMB 共享
+
+先在 Finder 中通过“前往 → 连接服务器”（`⌘K`）连接 SMB 共享。挂载完成后，点击 ZipGallery 的“已挂载共享”，或在打开、保存对话框中选择该共享目录。
+
+服务器登录由 macOS 管理。ZipGallery 当前不提供应用内 SMB 登录、自动重连或网络超时设置；共享离线时需要先在 Finder 中恢复连接。
+
+### 修复乱码文件名
+
+打开 ZIP / CBZ 后，点击“修复文件名编码…”，选择 GB18030 / GBK、Shift-JIS 或 CP437，检查预览，再保存 UTF-8 副本。
+
+原包保持不变。此功能修复文件名编码，不修复压缩数据损坏，也不能保证恢复已经丢失的名称信息；请以预览结果为准。
+
+### 常用快捷键
+
+- `⌘O`：打开压缩包。
+- `←` / `↑` / `PageUp`：上一张；`→` / `↓` / `PageDown`：下一张。
+- `0`：适应窗口；`1`：实际大小；`+` / `−`：缩放。
+- `Esc`：关闭大图，返回网格。
+- `Option + ←` / `Option + →`：切换本次已打开的上一个 / 下一个压缩包。
+
+## 当前限制与常见问题
+
+**为什么图片和原文件的透明效果不同？** 当前预览链路统一输出 JPEG，PNG / WebP 的透明度和精确无损像素不保留；原压缩包和解压出来的文件不会因此改变。动画暂不播放，HEIC / RAW 暂不支持预览。
+
+**超大图片能打开吗？** 单张图片解压输入上限为 96 MiB，像素上限为 2400 万；暂不支持超大图分块。超过限制的条目会显示错误，其他图片仍可浏览。
+
+**更新后怎么安装？** 退出正在运行的 ZipGallery，再用新版本替换“应用程序”里的旧应用。最近记录与缓存保存在用户资料目录；正常替换应用不删除这些数据。目前没有应用内自动更新入口。
+
+**怎样反馈问题？** 请到 [Issues](https://github.com/DuckFeather10086/ZipGallery/issues) 提供应用版本、macOS 版本、压缩格式、是否加密 / 位于 SMB，以及复现步骤。分享样本前请移除个人内容，优先提供最小合成样本。
+
+## 从源码构建
+
+在 macOS 上安装 Go、Bun 和 Xcode Command Line Tools。当前验证的工具版本为 Go 1.27.1、Bun 1.4.2。
 
 ```sh
-open build/darwin-arm64/ZipGallery.app
-```
-
-开发和重新构建（本轮实测 Go 1.27.1、Bun 1.4.2、macOS 27.0.1 / Apple M4）：
-
-```sh
+git clone https://github.com/DuckFeather10086/ZipGallery.git
+cd ZipGallery
 bun install --frozen-lockfile
 go mod download
-bun run dev
-# 发布构建，生成 .app 和本地 ad-hoc 签名的 .dmg
 bun run build
-# 只生成应用，不生成 DMG
-go run github.com/egoist/mygo/cmd/mygo build -skip-dmg
 ```
 
-`go.mod` / `go.sum`、`bun.lock` 与精确 npm 版本锁定依赖。MyGo / runtime / CLI 均为 0.4.5。应用未做 Developer ID 签名或 Apple 公证，仅本机开发验证。
+应用和 DMG 输出到 `build/darwin-arm64/`。开发运行、测试、架构和截图样本生成方法见 [开发文档](docs/DEVELOPMENT.md)，验证记录见 [VALIDATION.md](docs/VALIDATION.md)。
 
-## 使用
+## 许可证
 
-- “打开压缩包…”或 `⌘O` 选择文件；支持系统打开文件事件和文件拖入的统一入口。
-- 首屏是包内目录：点击文件夹进入，通过面包屑或 `↑` 返回上级。“全部图片”跨目录浏览。
-- 点击图片查看大图，左右/上下方向键、PageUp / PageDown 或按钮翻页。适应窗口模式下滚轮翻页；实际大小和放大模式下滚轮滚动图片。
-- “适应窗口” / `0`、 “实际大小” / `1`；`＋` / `−` 缩放。`Esc` 返回网格，保留目录、选中项及滚动位置。
-- 左上角 `←` / `→`（`Alt+←` / `Alt+→`）切换本轮打开过的压缩包，恢复之前的浏览状态。
-- 侧栏保存最近 20 个文件和阅读进度。进度使用条目身份，不只记录排序下标；重启后选择最近文件，再点“继续阅读”。跨压缩包前进/后退栈不跨重启保存。
-- 左下角切换简体中文 / English，选择自动保存。界面与错误文案位于 `src/locales/*.json`，Go 返回稳定错误码；添加语言时扩展 `src/i18n.ts` 的语言注册和语言选择项。
-- “刷新”清理图片缓存并重新读取压缩包；“清理缓存”只清理图片缓存。
-
-## 文件名编码修复
-
-打开乱码包后，点击“修复文件名编码…”，选择 GB18030 / GBK、Shift-JIS 或 CP437，预览后保存 UTF-8 副本。保存后自动打开副本。
-
-- 保留原压缩包，拒绝覆盖任何已有文件。
-- 复制原始压缩数据，不解压重压图片；更新文件名、注释编码和 UTF-8 标志，移除过期的 Unicode 名称扩展字段。
-- 已经有效的 UTF-8 名称保持不变。错误编码可能产生看似有效的乱码，必须检查预览；不宣称能自动识别所有旧编码或修复已经丢失的名称信息。
-- 解码失败、转换后名称冲突、源文件版本变化会中止。修复的是名称编码，不是损坏的压缩数据；加密包等未列入修复兼容性承诺。
-- 副本需要与原包相近的磁盘空间；这是显式的修复操作，普通打开不会复制整个压缩包。
-
-## 分层与资源限制
-
-- `internal/location`：本地 / mounted-local 来源，大小、版本、ReaderAt 和 Close。macOS 用 statfs 识别挂载的 SMB；不保存凭据，不猜测服务器或共享身份。
-- `internal/archive`：archive/zip 索引、自然排序、独立条目 ID、按需读取、CRC 校验、编码修复。保留子目录，过滤 `__MACOSX`、资源叉和非图片条目。
-- `internal/images`：2 个解码工作线程，当前大图优先于可见缩略图，再到邻图预读；同一会话条目合并请求。队列丢弃已取消请求；切包取消旧会话，旧请求不能覆盖新图。
-- `internal/gallery`：会话生命周期、最近记录、阅读进度、只接受当前条目 ID 的二进制协议。
-- `main.go`：MyGo 窗口、原生对话框、系统文件打开与单实例处理；前端统一调用 `OpenLocation`。
-- `src`：React 目录视图与 TanStack Virtual 网格、查看器、语言配置。
-
-缩略图最大 320×240；压缩图片解压输入上限 96 MiB，图片上限 2400 万像素，编码图片内存缓存 32 MiB，缩略图磁盘缓存 256 MiB。解码过程和 WebView 自身内存另计。当前显示链路统一输出 JPEG（质量 90），PNG / WebP 的透明度和精确无损像素不保留；JPEG EXIF 方向在后端归一化。动画不播放。内存不持久保留所有解码位图，前端 Blob URL 离开视图后释放。
-
-状态：`~/Library/Application Support/ZipGallery/recent.json`；缓存：`~/Library/Caches/ZipGallery/thumbs`。设置 `ZIPGALLERY_DATA_DIR=/path` 可隔离这两类测试数据。语言由 WebView 本地存储保存。
-
-## 已挂载 SMB 与限制
-
-系统已挂载的 SMB 文件使用同一随机读取接口，无需先复制到本地。检测到 SMB 或 `/Volumes` 路径时记录为 `mounted/local`；记录依赖当前挂载路径，挂载位置变化后需要重新选择文件。离线时保留历史记录。应用内 SMB 直连、自动重连、凭据管理、网络超时控制均未实现。
-
-已在实际挂载的 SMB 共享上用独立合成样本验证加密压缩、文件列表与解压往返，测试目录已清理。没有读取共享中的个人图片。断线恢复和网络性能尚未系统测试。
-
-当前仅验证 macOS / arm64。图片预览使用 ZIP Store / Deflate 与标准库 ZIP64 路径；加密包、RAR、7z 等走文件列表和解压流程。图片预览暂不支持 HEIC、RAW 或超大图分块。文件版本由大小和修改时间识别；保持两者不变的外部修改需要显式刷新。
-
-应用为 ZIP、CBZ、7z、RAR、tar、gz、bz2、xz、tgz 声明打开能力及文件图标。应用 SVG 源文件位于 `resources/icon.svg`，文件图标源文件位于 `resources/archive.svg`；`bun run build` 自动生成 PNG/ICNS 并打包。QA 版本仍使用 Alternate 排名。用户已明确要求设置本机默认打开程序，安装位置为 `~/Applications/ZipGallery.app`。其他机器可在 Finder 中设置默认打开程序。
-
-## 验证与合成样本
-
-```sh
-go test -race ./...
-go vet ./...
-bun test
-bun run build:web
-go run ./scripts/fixtures
-# 可选：生成约 3.05 GB / 1200 张合成图片的 CBZ
-go run ./scripts/fixtures -large
-go build -o build/benchmark ./scripts/benchmark
-/usr/bin/time -l build/benchmark fixtures/large.cbz
-```
-
-样本全部由代码生成；包含自然排序、中文/日文子目录、重复 basename、损坏图片、空图片包及 GBK 文件名。`fixtures/` 和构建产物不进入 Git。详细实测及未验证项见 `docs/VALIDATION.md`。
-
-### General archives
-
-The app bundles official 7zz 26.04 (including licenses and corresponding source) in its Resources directory. ZIP/CBZ retain the image preview. Other archives and ZIPs without supported images open as file lists. Create ZIP, 7z and tar.gz; extract formats supported by 7zz, including RAR (RAR creation is not supported). ZIP/7z creation supports passwords; encrypted archives use the file list/extraction workflow. Jobs expose progress and cancellation. Outputs always require a new name. Extraction rejects links and unsafe paths and writes under a restricted temporary directory.
-
-Mounted SMB shares are available through “Mounted shares” and native open/save panels. Connections and credentials remain managed by macOS. A synthetic encrypted round trip on an actual mounted share is covered in validation. Server disconnection can delay the underlying operating-system file calls.
-
-7-Zip provenance and corresponding source: `third_party/7zip/PROVENANCE.txt`. The app executes a replaceable standalone helper, without copying MacPacker code.
-
-## License
-
-ZipGallery 自身代码、文档和原创 SVG 图标采用 [MIT License](LICENSE)。内置 7zz 和其他第三方依赖保留各自许可证，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+ZipGallery 自身代码、文档和原创 SVG 图标采用 [MIT License](LICENSE)。内置 7zz 和其他第三方依赖保留各自许可证；应用中附带相关声明及 7-Zip 对应源码，详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
