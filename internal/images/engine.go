@@ -141,7 +141,7 @@ func (e *Engine) worker() {
 }
 func (e *Engine) render(j *job, gen uint64) ([]byte, error) {
 	file := filepath.Join(e.dir, j.key+".jpg")
-	if j.thumb {
+	if j.thumb && !j.s.Private {
 		e.diskMu.Lock()
 		b, err := os.ReadFile(file)
 		if err == nil {
@@ -181,7 +181,7 @@ func (e *Engine) render(j *job, gen uint64) ([]byte, error) {
 		return nil, err
 	}
 	result := out.Bytes()
-	if j.thumb {
+	if j.thumb && !j.s.Private {
 		e.diskMu.Lock()
 		e.mu.Lock()
 		valid := gen == e.generation

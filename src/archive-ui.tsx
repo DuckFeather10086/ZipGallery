@@ -41,7 +41,7 @@ export function ArchiveTools({
       const j = await Desktop.startArchive(
         mode === "extract" && view ? [view.location.path] : inputs,
         format,
-        password,
+        mode === "create" && format !== "tar.gz" ? password : "",
         t("outputTitle"),
         mode === "extract",
       );
@@ -62,6 +62,7 @@ export function ArchiveTools({
         <button
           onClick={() => {
             setMode("create");
+            setPassword("");
             setError("");
           }}
         >
@@ -71,6 +72,7 @@ export function ArchiveTools({
           disabled={!view || job?.state === "running"}
           onClick={() => {
             setMode("extract");
+            setPassword("");
             setError("");
           }}
         >
@@ -154,7 +156,7 @@ export function ArchiveTools({
               </>
             )}
             <p>{t(mode === "extract" ? "extractHint" : "createHint")}</p>
-            {(mode === "extract" || format !== "tar.gz") && (
+            {mode === "create" && format !== "tar.gz" && (
               <label>
                 {t("password")}{" "}
                 <input

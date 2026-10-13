@@ -42,7 +42,7 @@ go build -o build/benchmark ./scripts/benchmark
 - `internal/archive`：archive/zip 索引、自然排序、独立条目 ID、按需读取、CRC 校验、编码修复。保留子目录，过滤 `__MACOSX`、资源叉和非图片条目。
 - `internal/images`：2 个解码工作线程，当前大图优先于可见缩略图，再到邻图预读；同一会话条目合并请求。队列丢弃已取消请求；切包取消旧会话，旧请求不能覆盖新图。
 - `internal/gallery`：会话生命周期、最近记录、阅读进度、只接受当前条目 ID 的二进制协议。
-- `main.go`：MyGo 窗口、原生对话框、系统文件打开与单实例处理；前端统一调用 `OpenLocation`。
+- `main.go`：MyGo 窗口、原生对话框、系统文件打开与单实例处理；前端通过 `OpenArchive` 打开与解锁，`OpenLocation` 保留为无显式密码的入口。
 - `src`：React 目录视图与 TanStack Virtual 网格、查看器、语言配置。
 
 缩略图最大 320×240；压缩图片解压输入上限 96 MiB，图片上限 2400 万像素，编码图片内存缓存 32 MiB，缩略图磁盘缓存 256 MiB。解码过程和 WebView 自身内存另计。当前显示链路统一输出 JPEG（质量 90），PNG / WebP 的透明度和精确无损像素不保留；JPEG EXIF 方向在后端归一化。动画不播放。内存不持久保留所有解码位图，前端按相邻图片窗口淘汰 Blob URL，并取消过期预读。

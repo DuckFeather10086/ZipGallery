@@ -8,6 +8,7 @@
     "build": "bun run icons && go run github.com/egoist/mygo/cmd/mygo build",
     "dev:web": "vite",
     "build:web": "tsc --noEmit && vite build",
+    "test": "bun test",
     "icons": "bun scripts/icons.ts"
   },
   "dependencies": {
@@ -20,6 +21,7 @@
     "@resvg/resvg-js": "2.6.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "happy-dom": "21.0.1",
     "mygo-cli": "0.4.5",
     "prettier": "3.9.10",
     "typescript": "7.0.2",

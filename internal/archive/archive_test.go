@@ -86,3 +86,42 @@ func TestUnsupportedAndDamagedInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestExtractedPreviewCleanup(t *testing.T) {
+	source := filepath.Join(t.TempDir(), "source.zip")
+	if err := os.WriteFile(source, []byte("source"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, images := range []bool{true, false} {
+		root := filepath.Join(t.TempDir(), "preview")
+		content := filepath.Join(root, "files", "chapter")
+		if err := os.MkdirAll(content, 0700); err != nil {
+			t.Fatal(err)
+		}
+		if images {
+			if err := os.WriteFile(filepath.Join(content, "1.jpg"), []byte("image bytes"), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		s, err := OpenExtracted(location.Location{Path: source}, root, filepath.Join(root, "files"))
+		if images {
+			if err != nil {
+				t.Fatal(err)
+			}
+			if s.Entries[0].Name != "chapter/1.jpg" || s.Source.Location.Path != source {
+				t.Fatalf("bad source mapping: %+v", s.Entries)
+			}
+			b, err := s.Read(s.Entries[0])
+			if err != nil || string(b) != "image bytes" {
+				t.Fatal("cannot read preview", err)
+			}
+			s.Close()
+			s.Close()
+		} else if err == nil || err.Error() != "E_NO_IMAGES" {
+			t.Fatal("empty preview accepted", err)
+		}
+		if _, err := os.Stat(root); !os.IsNotExist(err) {
+			t.Fatal("plaintext temporary directory remains", err)
+		}
+	}
+}

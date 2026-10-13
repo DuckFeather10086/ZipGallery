@@ -93,6 +93,9 @@ func (d *Desktop) StartArchive(sources []string, format, password, title string,
 	if e != nil || dest == "" {
 		return archiver.Job{}, e
 	}
+	if extract && password == "" {
+		password = d.Core.ArchivePassword(sources[0])
+	}
 	return d.Jobs.Start(sources, dest, format, password, extract)
 }
 func (d *Desktop) JobStatus() archiver.Job { return d.Jobs.Status() }

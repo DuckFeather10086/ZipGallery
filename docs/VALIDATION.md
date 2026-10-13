@@ -65,3 +65,11 @@
 ## Continuous wheel paging revision
 
 Replaced per-gesture suppression with the same event-driven repeat sampler used for held arrow keys: immediate first/reversed input, 90 ms sustained cadence, fresh gesture after 160 ms idle. No timer or accumulated backlog advances pages after input ends. A synchronous live cursor prevents successive events from targeting the same stale React index; the wheel listener remains attached across page changes. Five Bun tests (48 assertions) cover continuous input, sampling-rate independence, held-key parity, reversal, fresh presses and stalls. Physical mouse/trackpad feel still requires user validation because native automation cannot dispatch wheel events in this app.
+
+## 2026-10-13 / v0.1.1 navigation and encrypted previews
+
+- Frontend DOM interaction regression test: parent-folder navigation, back/forward and Alt+Left, scroll restoration, forward-history branching, cross-archive reopening, failed navigation, wrong-password retry, cancelled/retried history unlock, and extraction dialogs without redundant password fields. Bridge responses are mocked; this is not native-window verification.
+- Backend integration tests use real 7zz for encrypted ZIP, 7z with visible headers, and 7z with encrypted headers. Empty/wrong passwords preserve the previous view; verified passwords allow real thumbnail/full-image responses, history restoration and extraction. Changed source versions invalidate remembered credentials.
+- Encrypted thumbnails stay out of the persistent disk cache. Temporary preview directories are removed on close and when no previewable images exist.
+- Native QA window inspection could not complete because the desktop tool returned `cgWindowNotFound`; no new native-window acceptance is claimed for this patch.
+- Release checks passed: `go test -race ./...`, `go vet ./...`, `bun test` (6 tests / 79 assertions), and the production arm64 app/DMG build with TypeScript checking.

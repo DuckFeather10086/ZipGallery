@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -27,14 +29,17 @@ type Entry struct {
 	Index    int    `json:"-"`
 }
 type Session struct {
-	ID      string
-	Source  *location.Source
-	Entries []Entry
-	files   []*zip.File
-	mu      sync.RWMutex
-	closed  bool
-	Context context.Context
-	cancel  context.CancelFunc
+	ID        string
+	Source    *location.Source
+	Entries   []Entry
+	files     []*zip.File
+	diskFiles []string
+	tempDir   string
+	Private   bool
+	mu        sync.RWMutex
+	closed    bool
+	Context   context.Context
+	cancel    context.CancelFunc
 }
 
 func Open(l location.Location) (*Session, error) {
@@ -84,6 +89,60 @@ func Open(l location.Location) (*Session, error) {
 	}
 	return s, nil
 }
+
+// OpenExtracted takes ownership of a private temporary directory, including on error.
+func OpenExtracted(l location.Location, root, contentRoot string) (*Session, error) {
+	src, err := location.Open(l)
+	if err != nil {
+		os.RemoveAll(root)
+		return nil, err
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Session{ID: fmt.Sprintf("%x", rand.Text()), Source: src, Context: ctx, cancel: cancel, tempDir: root, Private: true, Entries: []Entry{}}
+	err = filepath.WalkDir(contentRoot, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			return fmt.Errorf("E_UNSAFE_ARCHIVE")
+		}
+		if d.Name() == "__MACOSX" || strings.HasPrefix(d.Name(), "._") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		ext := strings.ToLower(filepath.Ext(p))
+		if ext != ".jpg" && ext != ".jpeg" && ext != ".png" && ext != ".webp" {
+			return nil
+		}
+		n, err := filepath.Rel(contentRoot, p)
+		if err != nil {
+			return err
+		}
+		n = filepath.ToSlash(n)
+		folder := path.Dir(n)
+		if folder == "." {
+			folder = ""
+		}
+		i := len(s.diskFiles)
+		s.diskFiles = append(s.diskFiles, p)
+		s.Entries = append(s.Entries, Entry{fmt.Sprintf("%s-%d", s.ID, i), n, folder, n + "#1", i})
+		return nil
+	})
+	if err == nil && len(s.Entries) == 0 {
+		err = fmt.Errorf("E_NO_IMAGES")
+	}
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+	sort.SliceStable(s.Entries, func(i, j int) bool { return NaturalLess(s.Entries[i].Name, s.Entries[j].Name) })
+	return s, nil
+}
 func NaturalLess(a, b string) bool {
 	aa, bb := []rune(strings.ToLower(a)), []rune(strings.ToLower(b))
 	i, j := 0, 0
@@ -126,6 +185,18 @@ func (s *Session) Read(e Entry) ([]byte, error) {
 	if err := s.Context.Err(); err != nil {
 		return nil, err
 	}
+	if s.tempDir != "" {
+		f, err := os.Open(s.diskFiles[e.Index])
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		b, err := io.ReadAll(io.LimitReader(f, MaxBytes+1))
+		if len(b) > MaxBytes {
+			return nil, fmt.Errorf("E_BYTES")
+		}
+		return b, err
+	}
 	f := s.files[e.Index]
 	if f.Flags&1 != 0 {
 		return nil, fmt.Errorf("E_ENCRYPTED")
@@ -160,5 +231,8 @@ func (s *Session) Close() {
 	if !s.closed {
 		s.closed = true
 		s.Source.Close()
+		if s.tempDir != "" {
+			os.RemoveAll(s.tempDir)
+		}
 	}
 }

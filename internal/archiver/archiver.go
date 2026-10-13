@@ -333,3 +333,8 @@ func (m *Manager) work(ctx context.Context, sources []string, dest, format, pass
 	}
 	return nil
 }
+
+// ExtractTo uses the same validated, sandboxed extraction as a user extraction job.
+func ExtractTo(ctx context.Context, source, dest, password string) error {
+	return (&Manager{}).work(ctx, []string{source}, dest, "", password, true)
+}

@@ -6,7 +6,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { createRoot } from "react-dom/client";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { onFileDrop, runtime } from "mygo-runtime";
 import {
@@ -476,9 +475,10 @@ type Snapshot = {
   folder: string;
   all: boolean;
   selected: string;
+  filesMode: boolean;
   positions: Record<string, number>;
 };
-function App() {
+export function App() {
   const locale = useLocale();
   const [repair, setRepair] = useState(false);
   const [filesMode, setFilesMode] = useState(false),
@@ -495,6 +495,8 @@ function App() {
     [notice, setNotice] = useState("");
   const positions = useRef<Record<string, number>>({});
   const generation = useRef(0);
+  const navigating = useRef(false);
+  const lockedTravel = useRef<"back" | "forward" | null>(null);
   const back = useRef<Snapshot[]>([]),
     forward = useRef<Snapshot[]>([]);
   const snapshot = useRef<Snapshot | null>(null);
@@ -503,6 +505,7 @@ function App() {
         path: view.location.path,
         folder,
         all,
+        filesMode,
         selected: view.entries.find((e) => e.id === selected)?.identity || "",
         positions: { ...positions.current },
       }
@@ -511,7 +514,7 @@ function App() {
     keepFullImages([]);
     if (!v.id) return;
     setView(v);
-    setFilesMode(!v.entries.length);
+    setFilesMode(restore?.filesMode ?? !v.entries.length);
     setFolder(restore?.folder ?? (v.folder === "*" ? "" : v.folder || ""));
     setAll(restore?.all ?? v.folder === "*");
     setReader(null);
@@ -525,7 +528,9 @@ function App() {
       .catch((e) => setError(message(e)));
   }, []);
   const open = useCallback(
-    async (path?: string) => {
+    async (path?: string, secret = "") => {
+      if (navigating.current) return;
+      navigating.current = true;
       const g = ++generation.current,
         previous = snapshot.current
           ? { ...snapshot.current, positions: { ...positions.current } }
@@ -535,38 +540,47 @@ function App() {
       try {
         path = path || (await Desktop.selectArchive(t("openTitle")));
         if (!path) return;
-        const v = await Desktop.openArchive(path, "");
+        const v = await Desktop.openArchive(path, secret);
         if (g === generation.current && v.id) {
           if (previous && previous.path !== v.location.path) {
             back.current.push(previous);
             forward.current = [];
           }
           adopt(v);
+          setLocked("");
+          setPassword("");
         }
       } catch (e) {
         if (g === generation.current) {
-          if (String(e).includes("E_PASSWORD") && path) setLocked(path);
-          else setError(message(e));
+          if (String(e).includes("E_PASSWORD") && path) {
+            lockedTravel.current = null;
+            setLocked(path);
+            if (secret) setError(message(e));
+          } else setError(message(e));
         }
       } finally {
-        if (g === generation.current) setBusy(false);
+        if (g === generation.current) {
+          navigating.current = false;
+          setBusy(false);
+        }
       }
     },
     [adopt],
   );
-  const travel = async (direction: "back" | "forward") => {
+  const travel = async (direction: "back" | "forward", secret = "") => {
     const source = direction === "back" ? back : forward,
       target = direction === "back" ? forward : back;
     const restore = source.current.at(-1);
-    if (!restore || busy) return;
+    if (!restore || navigating.current) return;
+    navigating.current = true;
     setBusy(true);
     setError("");
     const g = ++generation.current;
     try {
-      const v = await Desktop.openLocation({
-        kind: "local",
-        path: restore.path,
-      });
+      const v =
+        view?.location.path === restore.path
+          ? view
+          : await Desktop.openArchive(restore.path, secret);
       if (g === generation.current) {
         if (snapshot.current)
           target.current.push({
@@ -575,10 +589,21 @@ function App() {
           });
         source.current.pop();
         adopt(v, restore);
+        setLocked("");
+        setPassword("");
+        lockedTravel.current = null;
+        Desktop.progress(v.id, "", restore.all ? "*" : restore.folder).catch(
+          (e) => setError(message(e)),
+        );
       }
     } catch (e) {
-      setError(message(e));
+      if (String(e).includes("E_PASSWORD")) {
+        lockedTravel.current = direction;
+        setLocked(restore.path);
+        if (secret) setError(message(e));
+      } else setError(message(e));
     } finally {
+      navigating.current = false;
       setBusy(false);
     }
   };
@@ -594,7 +619,7 @@ function App() {
     });
     let polling = false;
     const poll = setInterval(async () => {
-      if (polling) return;
+      if (polling || navigating.current) return;
       polling = true;
       try {
         const p = await Desktop.pending();
@@ -612,6 +637,7 @@ function App() {
   }, [adopt, open]);
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
+      if (locked) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "o") {
         e.preventDefault();
         void open();
@@ -625,7 +651,7 @@ function App() {
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
-  }, [open, reader, busy]);
+  }, [open, reader, busy, view, locked]);
   const entries = useMemo(
     () => view?.entries.filter((e) => all || e.folder === folder) || [],
     [view, folder, all],
@@ -658,6 +684,17 @@ function App() {
     [view],
   );
   const navigate = (f: string, a = false) => {
+    if (navigating.current || !view) return;
+    if (f === folder && a === all && !filesMode) {
+      setReader(null);
+      return;
+    }
+    if (snapshot.current)
+      back.current.push({
+        ...snapshot.current,
+        positions: { ...positions.current },
+      });
+    forward.current = [];
     setFilesMode(!view?.entries.length);
     setFolder(f);
     setAll(a);
@@ -907,33 +944,33 @@ function App() {
             className="repair-dialog"
             onSubmit={async (e) => {
               e.preventDefault();
-              try {
-                const v = await Desktop.openArchive(locked, password);
-                if (snapshot.current) back.current.push(snapshot.current);
-                adopt(v);
-                setLocked("");
-                setPassword("");
-                setError("");
-              } catch (e) {
-                setError(message(e));
-              }
+              if (lockedTravel.current)
+                await travel(lockedTravel.current, password);
+              else await open(locked, password);
             }}
           >
             <h2>{t("unlock")}</h2>
             <input
               type="password"
+              required
+              disabled={busy}
               aria-label={t("password")}
               autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
             {error && <p>{error}</p>}
-            <button type="submit">{t("openFile")}</button>
+            <button type="submit" disabled={busy || !password}>
+              {t("openFile")}
+            </button>
             <button
               type="button"
+              disabled={busy}
               onClick={() => {
+                lockedTravel.current = null;
                 setLocked("");
                 setPassword("");
+                setError("");
               }}
             >
               {t("cancel")}
@@ -968,4 +1005,3 @@ function App() {
     </div>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);

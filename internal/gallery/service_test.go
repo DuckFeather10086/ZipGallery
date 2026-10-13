@@ -3,14 +3,19 @@ package gallery
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
+	"zipgallery/internal/archiver"
 	"zipgallery/internal/location"
 )
 
@@ -111,5 +116,118 @@ func TestLegacyNamesRemainSerializable(t *testing.T) {
 		if !utf8.ValidString(e.Name) || !utf8.ValidString(e.Folder) || !utf8.ValidString(e.Identity) {
 			t.Fatal("invalid UTF8 in public metadata")
 		}
+	}
+}
+
+func TestEncryptedPreviewAndHistory(t *testing.T) {
+	for _, variant := range []string{"zip", "7z", "7z-headers"} {
+		t.Run(variant, func(t *testing.T) {
+			format := strings.TrimSuffix(variant, "-headers")
+			root := t.TempDir()
+			src := filepath.Join(root, "pages")
+			if err := os.MkdirAll(filepath.Join(src, "chapter"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			im := image.NewRGBA(image.Rect(0, 0, 32, 32))
+			var jpg bytes.Buffer
+			if err := jpeg.Encode(&jpg, im, nil); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(src, "chapter", "1.jpg"), jpg.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			p := filepath.Join(root, "secret."+format)
+			args := []string{"a", "-t" + format, "-p"}
+			if variant == "7z-headers" {
+				args = append(args, "-mhe=on")
+			}
+			args = append(args, p, "pages")
+			cmd := exec.Command(archiver.Binary(), args...)
+			cmd.Dir = root
+			cmd.Stdin = strings.NewReader("correct\ncorrect\n")
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("%v: %s", err, out)
+			}
+			cache := t.TempDir()
+			s := New(t.TempDir(), cache)
+			defer s.Close()
+			plain := sample(t)
+			before, err := s.OpenLocation(location.Location{Path: plain})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, password := range []string{"", "wrong"} {
+				if _, err := s.OpenArchive(location.Location{Path: p}, password); err == nil || err.Error() != "E_PASSWORD" {
+					t.Fatalf("password %q: %v", password, err)
+				}
+				if s.Current().ID != before.ID {
+					t.Fatal("failed unlock replaced previous view")
+				}
+				if s.ArchivePassword(p) != "" {
+					t.Fatal("unverified password remembered")
+				}
+			}
+			v, err := s.OpenArchive(location.Location{Path: p}, "correct")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(v.Entries) != 1 || v.Entries[0].Name != "pages/chapter/1.jpg" || v.Entries[0].Folder != "pages/chapter" || v.Location.Path != p {
+				t.Fatalf("bad preview: %+v", v)
+			}
+			session := s.session
+			for _, kind := range []string{"thumb", "full"} {
+				r := httptest.NewRecorder()
+				s.ServeHTTP(r, httptest.NewRequest("GET", "gallery://localhost/"+kind+"/"+v.Entries[0].ID, nil))
+				if r.Code != 200 {
+					t.Fatal(r.Code, r.Body.String())
+				}
+			}
+			disk, err := os.ReadDir(cache)
+			if err != nil || len(disk) != 0 {
+				t.Fatalf("encrypted preview persisted to thumbnail cache: %v %v", disk, err)
+			}
+			if err := s.Progress(v.ID, v.Entries[0].ID, v.Entries[0].Folder); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := s.OpenLocation(location.Location{Path: plain}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := session.Read(v.Entries[0]); err == nil {
+				t.Fatal("closed preview still accessible")
+			}
+			restored, err := s.OpenLocation(location.Location{Path: p})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if restored.Progress != v.Entries[0].Identity || restored.Folder != v.Entries[0].Folder {
+				t.Fatalf("lost history: %+v", restored)
+			}
+			if restored.Entries[0].ID == v.Entries[0].ID {
+				t.Fatal("stale entry ID reused")
+			}
+			out := filepath.Join(root, "extracted")
+			if err := archiver.ExtractTo(context.Background(), p, out, s.ArchivePassword(p)); err != nil {
+				t.Fatal(err)
+			}
+			b, err := os.ReadFile(filepath.Join(out, "pages", "chapter", "1.jpg"))
+			if err != nil || !bytes.Equal(b, jpg.Bytes()) {
+				t.Fatal("extraction failed", err)
+			}
+			// Modifying the source invalidates the remembered password.
+			future := time.Now().Add(time.Second * 2)
+			if err := os.Chtimes(p, future, future); err != nil {
+				t.Fatal(err)
+			}
+			if s.ArchivePassword(p) != "" {
+				t.Fatal("password reused for changed source")
+			}
+			if _, err := s.OpenLocation(location.Location{Path: p}); err == nil || err.Error() != "E_PASSWORD" {
+				t.Fatal("changed archive did not relock", err)
+			}
+			s.Close()
+			if s.Current().ID != "" || s.ArchivePassword(p) != "" {
+				t.Fatal("close retained view or password")
+			}
+		})
 	}
 }

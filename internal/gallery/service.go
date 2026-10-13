@@ -38,12 +38,15 @@ type Service struct {
 	general   *View
 	entries   map[string]archive.Entry
 	recents   []Recent
+	passwords map[string]credential
 	stateFile string
 	Engine    *images.Engine
 }
 
+type credential struct{ password, version string }
+
 func New(state, cache string) *Service {
-	s := &Service{stateFile: filepath.Join(state, "recent.json"), Engine: images.New(cache), recents: []Recent{}}
+	s := &Service{stateFile: filepath.Join(state, "recent.json"), Engine: images.New(cache), recents: []Recent{}, passwords: map[string]credential{}}
 	_ = os.MkdirAll(state, 0700)
 	b, err := os.ReadFile(s.stateFile)
 	if err == nil {
@@ -57,18 +60,60 @@ func (s *Service) OpenLocation(l location.Location) (View, error) {
 func (s *Service) OpenArchive(l location.Location, password string) (View, error) {
 	s.openMu.Lock()
 	defer s.openMu.Unlock()
-	files, listErr := archiver.List(context.Background(), l.Path, password)
-	next, err := archive.Open(l)
+	// Resolve the original source before listing; history always keeps this path.
+	src, err := location.Open(l)
 	if err != nil {
-		if listErr != nil {
-			return View{}, listErr
+		return View{}, err
+	}
+	l = src.Location
+	version := src.Version
+	src.Close()
+	if strings.ContainsAny(password, "\r\n") {
+		return View{}, fmt.Errorf("E_PASSWORD")
+	}
+	if password == "" {
+		password = s.ArchivePassword(l.Path)
+	}
+	files, listErr := archiver.List(context.Background(), l.Path, password)
+	if listErr != nil {
+		return View{}, listErr
+	}
+	encrypted := false
+	for _, f := range files {
+		encrypted = encrypted || f.Encrypted
+	}
+	var next *archive.Session
+	if encrypted {
+		if password == "" {
+			return View{}, fmt.Errorf("E_PASSWORD")
 		}
+		root, e := os.MkdirTemp("", "zipgallery-preview-")
+		if e != nil {
+			return View{}, e
+		}
+		output := filepath.Join(root, "files")
+		if e = archiver.ExtractTo(context.Background(), l.Path, output, password); e != nil {
+			os.RemoveAll(root)
+			return View{}, e
+		}
+		// The session owns the outer directory so closing it removes all plaintext.
+		next, err = archive.OpenExtracted(l, root, output)
+	} else {
+		next, err = archive.Open(l)
+	}
+	if err != nil && encrypted && err.Error() != "E_NO_IMAGES" {
+		return View{}, err
+	}
+	if err != nil {
 		s.mu.Lock()
 		old := s.session
 		s.session = nil
 		s.entries = nil
 		v := View{ID: fmt.Sprint(time.Now().UnixNano()), Name: filepath.Base(l.Path), Location: l, Entries: []archive.Entry{}, Files: files}
 		s.general = &v
+		if password != "" {
+			s.passwords[l.Path] = credential{password, version}
+		}
 		s.upsert(Recent{Location: l, Updated: time.Now().Unix()})
 		s.mu.Unlock()
 		if old != nil {
@@ -76,14 +121,11 @@ func (s *Service) OpenArchive(l location.Location, password string) (View, error
 		}
 		return v, nil
 	}
-	for _, f := range files {
-		if f.Encrypted {
-			next.Entries = []archive.Entry{}
-			break
-		}
-	}
 	s.mu.Lock()
 	s.general = nil
+	if password != "" {
+		s.passwords[l.Path] = credential{password, version}
+	}
 	old := s.session
 	s.session = next
 	s.entries = map[string]archive.Entry{}
@@ -107,6 +149,23 @@ func (s *Service) OpenArchive(l location.Location, password string) (View, error
 		old.Close()
 	}
 	return v, nil
+}
+
+// ArchivePassword returns only credentials verified for this exact source version.
+// It is used internally for extraction and is never exposed through the UI bridge.
+func (s *Service) ArchivePassword(path string) string {
+	src, err := location.Open(location.Location{Path: path})
+	if err != nil {
+		return ""
+	}
+	defer src.Close()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c := s.passwords[src.Location.Path]
+	if c.version == src.Version {
+		return c.password
+	}
+	return ""
 }
 func (s *Service) view() View {
 	if s.general != nil {
@@ -193,6 +252,8 @@ func (s *Service) Close() {
 	s.mu.Lock()
 	old := s.session
 	s.session = nil
+	s.general = nil
+	s.passwords = map[string]credential{}
 	s.entries = nil
 	s.mu.Unlock()
 	if old != nil {

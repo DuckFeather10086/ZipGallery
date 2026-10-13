@@ -26,7 +26,7 @@ export default defineConfig({
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
   ],
-  version: "0.1.0",
+  version: "0.1.1",
   devUrl: "http://localhost:5173",
   devCommand: "bun run dev:web",
   buildCommand: "bun run build:web",

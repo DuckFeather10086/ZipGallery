@@ -559,9 +559,17 @@ h1 {
   gap: 5px;
 }
 .history-controls button {
-  font-size: 17px;
-  line-height: 16px;
-  padding: 5px 10px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+.history-controls button:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 .header-actions button {
   font-size: 11px;
